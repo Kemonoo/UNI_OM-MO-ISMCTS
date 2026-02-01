@@ -23,7 +23,11 @@ while not game.is_terminal():
     print(game)
     print("_______________________")
 
-print(game.winner)
+print("_______________________")
+print("Game over")
+print(game)
+print(f"Player {game.winner} won.")
+print("_______________________")
 
 def play_game(p1, p2):
     pass

@@ -1,15 +1,20 @@
 
+from phantom_ttt_state import PhantomTTTState
 
 class Node():
     def __init__(self, move=None, parent=None, state=None):
-        self.move = move    # Move taken to get to this node
-        self.parent = parent
-        self.children = []
-        self.wins = 0
+        # Structure
+        self.move = move        # Move taken to get to this node
+        self.parent = parent    # Parent Node 
+        self.children = []      # 
+
+        # Stats
         self.visits = 0
-        
-        # Tracks how many times was this node available
+        self.reward = 0
         self.availability_count = 0
+
+        self.untried_moves = state.get_legal_actions(state.current_player)
+        
 
 
 class MOISMCTS():
