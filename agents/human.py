@@ -4,7 +4,7 @@ class HumanPlayer():
         self.player_id = player_id
 
     def get_action(self, state: PhantomTTTState):
-        valid_moves = state.get_legal_actions_for_current_player()
+        valid_moves = state.get_legal_actions(state.current_player)
 
         if not valid_moves:
             raise ValueError("no valid moves")

@@ -4,7 +4,7 @@ class PhantomTTTState():
         # 0 -> empty 
         # 1 -> P1  
         # 2 -> P2 
-        self.board = [0] * 9
+        self.board = [0] * 9    # True state
 
         self.current_player = 1     # P1 -> 1; P2 -> 2
         self.winner = None
@@ -21,7 +21,7 @@ class PhantomTTTState():
         """
 
         # Serves mainly as a bug prevention
-        if action not in self.get_legal_actions_for_current_player():
+        if action not in self.get_legal_actions(self.current_player):
             raise ValueError(f"Agent {self.current_player} attempted illegal move at {action}.\n")
 
         opponent = 3 - self.current_player
@@ -40,17 +40,17 @@ class PhantomTTTState():
                 self.current_player = opponent
             return True     # Indicate Success
 
-    def get_legal_actions_for_current_player(self):
+    def get_legal_actions(self, player_id):
         """
         Returns list of indices (0 - 8) where the current player is ALLOWED to move
         based on their observation space
         """
         legal_actions = []
 
-        known_opponent_indices = self.revealed_opponent_positions[self.current_player]
+        known_opponent_indices = self.revealed_opponent_positions[player_id]
 
         for i, content in enumerate(self.board):
-            if content != self.current_player and i not in known_opponent_indices:
+            if content != player_id and i not in known_opponent_indices:
                 legal_actions.append(i)
 
         return legal_actions
