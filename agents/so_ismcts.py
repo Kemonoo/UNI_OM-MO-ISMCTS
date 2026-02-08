@@ -1,12 +1,10 @@
-import math
 import random
+import math
 
 from phantom_ttt_state import PhantomTTTState
 
 class Node():   #v
-    def __init__(self, action=None, parent=None, state=None):
-        self.state = state 
-
+    def __init__(self, action=None, parent=None):
         # Structure
         self.children = []      # c(v) List of child nodes
         self.action = action    # a(v) Move taken to get to this node
@@ -15,10 +13,9 @@ class Node():   #v
         # Stats
         self.visits = 0                 # n(v)
         self.availability_count = 0     # n'(v)
-        self.total_reward = 0.0                 # r(v)
+        self.total_reward = 0.0         # r(v)
 
     def _ucb(self, exploration_constant=0.7):
-
         if self.visits == 0 or self.availability_count == 0:
             return float('inf')
         
@@ -37,29 +34,25 @@ class SOISMCTS():
 
     def choose_action(self, state):
         # Initialize
-        root = Node(state=state)
+        root = Node()
 
         for _ in range(self.iterations):
             # Initialize
             current_node = root
+            visited_nodes = []  # Visited nodes with available compatible children
 
             # A: Determinization
             d = state.determinize()
 
             # B: Selection
             while not d.is_terminal() and len(self._get_untried_actions(d, current_node)) == 0:
-                
-                # Get compatible children
-                legal_actions_set = set(d.get_legal_actions())
-                
-                compatible_children = [
-                    c for c in current_node.children 
-                    if c.action in legal_actions_set
-                    ]
+                compatible_children = self._get_compatible_children(d, current_node)
 
                 # Select child with highest UCB
                 best_child = max(compatible_children, key=lambda c: c._ucb())
 
+                # Update
+                visited_nodes.append((best_child, compatible_children))
                 d.apply_action(best_child.action)
                 current_node = best_child
 
@@ -69,7 +62,10 @@ class SOISMCTS():
                 new_child = Node(action=action, parent=current_node)
                 current_node.children.append(new_child)
 
-                d.play_action(action)
+                # Update
+                compatible_children = self._get_compatible_children(d, current_node)
+                visited_nodes.append((new_child, compatible_children))
+                d.apply_action(action)
                 current_node = new_child
 
             # D: Simulation
@@ -80,8 +76,31 @@ class SOISMCTS():
             reward = d.get_reward(self.player)
 
             # E: Backpropagation
+            for node, available_nodes in visited_nodes:
+                node.visits += 1
+                node.total_reward += reward
+
+                for n in available_nodes:
+                    n.availability_count += 1
+
+            # also update the root
+            root.visits += 1
+            root.total_reward += reward
+
+        # Return best action
+
+        best_child = max(root.children, key=lambda c: c.visits)
+        return best_child.action
             
-            
+
+    def _get_compatible_children(self, d: PhantomTTTState, node: Node):
+        legal_actions_set = set(d.get_legal_actions())
+        compatible_children = [
+            c for c in node.children
+            if c.action in legal_actions_set
+        ]
+        return compatible_children
+
 
     def _get_untried_actions(self, d: PhantomTTTState, node: Node):
         # Returns untried action compatible with current determinization and the current tree status

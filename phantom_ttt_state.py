@@ -1,3 +1,5 @@
+import random
+import copy
 
 class PhantomTTTState():
     def __init__(self):
@@ -21,7 +23,7 @@ class PhantomTTTState():
         """
 
         # Serves mainly as a bug prevention
-        if action not in self.get_legal_actions(self.current_player):
+        if action not in self.get_legal_actions():
             raise ValueError(f"Agent {self.current_player} attempted illegal move at {action}.\n")
 
         opponent = 3 - self.current_player
@@ -40,11 +42,13 @@ class PhantomTTTState():
                 self.current_player = opponent
             return True     # Indicate Success
 
-    def get_legal_actions(self, player_id):
+    def get_legal_actions(self):
         """
         Returns list of indices (0 - 8) where the current player is ALLOWED to move
         based on their observation space
         """
+        player_id = self.current_player
+
         legal_actions = []
 
         known_opponent_indices = self.revealed_opponent_positions[player_id]
@@ -62,6 +66,9 @@ class PhantomTTTState():
             if self.board[a] == self.board[b] == self.board[c] and self.board[a] != 0:
                 self.winner = self.board[a]
                 return
+
+        if 0 not in self.board:
+            self.winner = 0
     
     def get_player_observation(self, player_id):
         """
@@ -79,18 +86,29 @@ class PhantomTTTState():
 
 
     def is_terminal(self):
-        return self.winner is not None or 0 not in self.board
+        return self.winner is not None
     
     ########## ISMCTS DEPENDENT FUNCTIONS ##########
+    def determinise(self):
+        copy = self._clone()
+
+        opponent = 3 - self.current_player
+
+        hidden_count =  count()
+
+        pass
+    
+    def _clone(self):
+        return copy.deepcopy(self)
+
+
     def get_reward(self, player_id):
-        pass
-
-    def determinise(self, observer_id):
-        pass
-
-    def get_observation(self, viewer_id, action):
-        pass
-
+        if self.winner == player_id: return 1.0
+        if self.winner == 3 - player_id: return -1.0
+        if self.winner == 0: return 0.0
+        else:
+            raise ValueError("There is no winner")
+        
 
     ########## UTILITY FUNCTIONS ##########
     def __str__(self):
