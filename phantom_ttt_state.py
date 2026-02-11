@@ -89,18 +89,37 @@ class PhantomTTTState():
         return self.winner is not None
     
     ########## ISMCTS DEPENDENT FUNCTIONS ##########
-    def determinise(self):
-        copy = self._clone()
+    def determinize(self):
+        # COPY
+        new_state = copy.deepcopy(self)
 
+        # RESHUFFLE HIDDEN INFO
+        new_board = [0] * 9
         opponent = 3 - self.current_player
 
-        hidden_count =  count()
+        for tile, piece in enumerate(self.board):
+            if piece == self.current_player:
+                new_board[tile] = piece
+            elif piece == opponent and tile in self.revealed_opponent_positions[self.current_player]:
+                new_board[tile] = piece
 
-        pass
-    
-    def _clone(self):
-        return copy.deepcopy(self)
+        # Find how many hidden pieces to place
+        total_opponent_pieces = self.board.count(opponent)
+        opponent_hidden_count = total_opponent_pieces - len(self.revealed_opponent_positions[self.current_player])
 
+        # Identify candidate tiles
+        player_observation = self.get_player_observation(self.current_player)
+        candidates = [tile for tile, piece in enumerate(player_observation) if piece == 0]
+
+        # Random sampling without replacement
+        random.shuffle(candidates)
+        selected_indices = candidates[:opponent_hidden_count]
+
+        for tile in selected_indices:
+            new_board[tile] = opponent
+
+        new_state.board = new_board
+        return new_state
 
     def get_reward(self, player_id):
         if self.winner == player_id: return 1.0
@@ -108,6 +127,10 @@ class PhantomTTTState():
         if self.winner == 0: return 0.0
         else:
             raise ValueError("There is no winner")
+        
+    def get_true_state_actions(self):
+        # Returns list of all empty tiles
+        return [action for action, piece in enumerate(self.board) if piece == 0]
         
 
     ########## UTILITY FUNCTIONS ##########
@@ -131,9 +154,4 @@ class PhantomTTTState():
     
 
 if __name__ == "__main__":
-    state = PhantomTTTState()
-    state.board = [0,0,1,0,2,2,1,0,0]
-    state.revealed_opponent_positions[1].add(5)
-
-    actions = state.get_legal_actions_for_current_player()
-    print(actions)
+    pass

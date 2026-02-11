@@ -32,7 +32,7 @@ class SOISMCTS():
         self.player = player
         self.iterations = iterations
 
-    def choose_action(self, state):
+    def get_action(self, state):
         # Initialize
         root = Node()
 
@@ -40,6 +40,13 @@ class SOISMCTS():
             # Initialize
             current_node = root
             visited_nodes = []  # Visited nodes with available compatible children
+
+            # # DEBUG
+            # if _ % 100 == 0:
+            #     print(f"________ iterations: {_} ________")
+            #     for child in root.children:
+            #         win_rate = child.total_reward / child.visits if child.visits > 0 else 0
+            #         print(f"{child.action:<10} | {child.visits:<12} | {child.availability_count:<12} | {child.total_reward:<10.1f} | {win_rate:<10.2f}")
 
             # A: Determinization
             d = state.determinize()
@@ -70,7 +77,7 @@ class SOISMCTS():
 
             # D: Simulation
             while not d.is_terminal():
-                action = random.choice(d.get_legal_actions())
+                action = random.choice(d.get_true_state_actions())
                 d.apply_action(action)
 
             reward = d.get_reward(self.player)
@@ -88,7 +95,6 @@ class SOISMCTS():
             root.total_reward += reward
 
         # Return best action
-
         best_child = max(root.children, key=lambda c: c.visits)
         return best_child.action
             

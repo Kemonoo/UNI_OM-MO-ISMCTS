@@ -6,7 +6,7 @@ class RandomAgent():
         self.player_id = player_id 
 
     def get_action(self, state: PhantomTTTState):
-        valid_moves = state.get_legal_actions(state.current_player)
+        valid_moves = state.get_legal_actions()
 
         if not valid_moves:
             raise ValueError("no valid moves")
