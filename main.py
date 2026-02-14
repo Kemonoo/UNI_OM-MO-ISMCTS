@@ -15,11 +15,11 @@ from agents.so_ismcts import SOISMCTS
 #     current_player = game.current_player
 
 #     if current_player == 1:
-#         action = a1.get_action(game)
+#         move = a1.get_move(game)
 #     else:
-#         action = a2.get_action(game)
+#         move = a2.get_move(game)
 
-#     game.apply_action(action)
+#     game.apply_move(move)
 
 #     print("_______________________\n")
 #     print("Current true board")
@@ -39,11 +39,11 @@ def play_game(p1=RandomAgent(1), p2=RandomAgent(2)):
         current_player = game.current_player
 
         if current_player == 1:
-            action = p1.get_action(game)
+            move = p1.get_move(game)
         else:
-            action = p2.get_action(game)
+            move = p2.get_move(game)
 
-        game.apply_action(action)
+        game.apply_move(move)
 
     return game.winner
 
@@ -63,5 +63,5 @@ if __name__ == '__main__':
     p1 = SOISMCTS(1, 1000)
     p2 = RandomAgent(2)
 
-    play_game(p1, p2)
-    # play_n_games(p1, p2, 1000)
+    print(play_game(p1, p2))
+    play_n_games(p1, p2, 1000)

@@ -15,49 +15,49 @@ class PhantomTTTState():
         self.revealed_opponent_positions = {1: set(), 2: set()}
         
     ########## GAME LOGIC FUNCTIONS ##########
-    def apply_action(self, action):
+    def apply_move(self, move):
         """
-        Updates the board state based on the action.
+        Updates the board state based on the move.
         If blocked: Updates revealed info, notifies the opponent, the player does not change.
         If success: Updates board, player changes.
         """
 
         # Serves mainly as a bug prevention
-        if action not in self.get_legal_actions():
-            raise ValueError(f"Agent {self.current_player} attempted illegal move at {action}.\n")
+        if move not in self.get_legal_moves():
+            raise ValueError(f"Agent {self.current_player} attempted illegal move at {move}.\n")
 
         opponent = 3 - self.current_player
 
         # COLLISION
-        if self.board[action] == opponent:
-            self.revealed_opponent_positions[self.current_player].add(action)
+        if self.board[move] == opponent:
+            self.revealed_opponent_positions[self.current_player].add(move)
             return False    # Indicate Collision
 
         # SUCCESS
         else:
-            self.board[action] = self.current_player
+            self.board[move] = self.current_player
             self.check_winner()
 
             if self.winner is None:
                 self.current_player = opponent
             return True     # Indicate Success
 
-    def get_legal_actions(self):
+    def get_legal_moves(self):
         """
         Returns list of indices (0 - 8) where the current player is ALLOWED to move
         based on their observation space
         """
         player_id = self.current_player
 
-        legal_actions = []
+        legal_moves = []
 
         known_opponent_indices = self.revealed_opponent_positions[player_id]
 
         for i, content in enumerate(self.board):
             if content != player_id and i not in known_opponent_indices:
-                legal_actions.append(i)
+                legal_moves.append(i)
 
-        return legal_actions
+        return legal_moves
 
     def check_winner(self):
         wins = [(0,1,2), (3,4,5), (6,7,8), (0,3,6), (1,4,7), (2,5,8), (0,4,8), (2,4,6)]
@@ -90,10 +90,10 @@ class PhantomTTTState():
     
     ########## ISMCTS DEPENDENT FUNCTIONS ##########
     def determinize(self):
-        # COPY
+        # ---COPY---
         new_state = copy.deepcopy(self)
 
-        # RESHUFFLE HIDDEN INFO
+        # ---RESHUFFLE HIDDEN INFO---
         new_board = [0] * 9
         opponent = 3 - self.current_player
 
@@ -118,7 +118,11 @@ class PhantomTTTState():
         for tile in selected_indices:
             new_board[tile] = opponent
 
+        # ---UPDATE THE NEW STATE---
         new_state.board = new_board
+        # We don't know what pieces has the opponent revealed
+        new_state.revealed_opponent_positions[opponent] = set() 
+
         return new_state
 
     def get_reward(self, player_id):

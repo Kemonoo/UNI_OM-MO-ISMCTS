@@ -32,7 +32,7 @@ class SOISMCTS():
         self.player = player
         self.iterations = iterations
 
-    def get_action(self, state):
+    def get_move(self, state):
         # Initialize
         root = Node()
 
@@ -60,7 +60,7 @@ class SOISMCTS():
 
                 # Update
                 visited_nodes.append((best_child, compatible_children))
-                d.apply_action(best_child.action)
+                d.apply_move(best_child.action)
                 current_node = best_child
 
             # C: Expansion
@@ -72,13 +72,13 @@ class SOISMCTS():
                 # Update
                 compatible_children = self._get_compatible_children(d, current_node)
                 visited_nodes.append((new_child, compatible_children))
-                d.apply_action(action)
+                d.apply_move(action)
                 current_node = new_child
 
             # D: Simulation
             while not d.is_terminal():
                 action = random.choice(d.get_true_state_actions())
-                d.apply_action(action)
+                d.apply_move(action)
 
             reward = d.get_reward(self.player)
 
@@ -100,7 +100,7 @@ class SOISMCTS():
             
 
     def _get_compatible_children(self, d: PhantomTTTState, node: Node):
-        legal_actions_set = set(d.get_legal_actions())
+        legal_actions_set = set(d.get_legal_moves())
         compatible_children = [
             c for c in node.children
             if c.action in legal_actions_set
@@ -110,6 +110,6 @@ class SOISMCTS():
 
     def _get_untried_actions(self, d: PhantomTTTState, node: Node):
         # Returns untried action compatible with current determinization and the current tree status
-        legal_moves = d.get_legal_actions()
+        legal_moves = d.get_legal_moves()
         existing_actions = {child.action for child in node.children}
         return [action for action in legal_moves if action not in existing_actions]
