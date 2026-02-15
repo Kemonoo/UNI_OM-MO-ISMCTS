@@ -47,16 +47,13 @@ class MOISMCTS():
 
             # B: Selection
             while not d.is_terminal() and len(self._get_untried_moves(d, current_nodes[d.current_player])) == 0:
-                compatible_children_player = self._get_compatible_children(d, current_nodes[d.current_player])
-
-                if not compatible_children:
-                    return ValueError('No compatible children')
+                compatible_children = self._get_compatible_children(d, current_nodes[d.current_player])
 
                 # Select child with highest UCB
-                best_child = max(compatible_children_player, key=lambda c: c._ucb())
+                best_child = max(compatible_children, key=lambda c: c._ucb())
 
-                # Update active player
-                visited_nodes[d.current_player].append((best_child, compatible_children_player))
+                # Update current player
+                visited_nodes[d.current_player].append((best_child, compatible_children))
                 current_nodes[d.current_player] = best_child
 
                 # Update determinization and save opponent id
@@ -67,8 +64,9 @@ class MOISMCTS():
                 # gets a node 'opponent moved', since no information is revealed. 
                 # If 'collision' occured we do nothing for the opponent
                 if success:
-                    child = self._find_or_create_child(d, current_nodes[opponent])
-                    current_nodes[opponent].children.append(child)
+                    exists, child = self._find_or_create_child(d, current_nodes[opponent])
+                    if not exists:
+                        current_nodes[opponent].children.append(child)
 
                     visited_nodes[opponent].append((child, [child]))
                     current_nodes[opponent] = child
@@ -76,37 +74,58 @@ class MOISMCTS():
 
             # C: Expansion
             if not d.is_terminal():
-                move = random.choice(self._get_untried_moves(d, current_node))
-                new_child = Node(move=move, parent=current_node)
-                current_node.children.append(new_child)
+                # Choose random move from untried moves based on observation and create a node for it
+                move = random.choice(self._get_untried_moves(d, current_nodes[d.current_player]))
+                new_child = Node(move=move, parent=current_nodes[d.current_player])
+                current_nodes[d.current_player].children.append(new_child)
 
-                # Update
-                compatible_children = self._get_compatible_children(d, current_node)
-                visited_nodes.append((new_child, compatible_children))
-                d.apply_move(move)
-                current_node = new_child
+
+                # Update current player
+                compatible_children = self._get_compatible_children(d, current_nodes[d.current_player])
+                visited_nodes[d.current_player].append((new_child, compatible_children))
+                current_nodes[d.current_player] = new_child
+
+                # Update determinization and save opponent id
+                opponent = 3 - d.current_player
+                success = d.apply_move(new_child.move)
+
+                # In case 'collision' does NOT occur, the opponent's tree 
+                # gets a node 'opponent moved', since no information is revealed. 
+                # If 'collision' occured we do nothing for the opponent
+                if success:
+                    exists, child = self._find_or_create_child(d, current_nodes[opponent])
+                    if not exists:
+                        current_nodes[opponent].children.append(child)
+
+                    visited_nodes[opponent].append((child, [child]))
+                    current_nodes[opponent] = child
 
             # D: Simulation
             while not d.is_terminal():
-                move = random.choice(d.get_true_state_moves())
+                move = random.choice(d.get_true_state_actions())
                 d.apply_move(move)
 
             reward = d.get_reward(self.player)
 
             # E: Backpropagation
-            for node, available_nodes in visited_nodes:
-                node.visits += 1
-                node.total_reward += reward
+            updates = [
+                (self.player, reward),
+                (3 - self.player, -reward)
+            ]
 
-                for n in available_nodes:
-                    n.availability_count += 1
+            for player, reward in updates:
+                path = visited_nodes[player]
+                for node, available_nodes in path:
+                    node.visits += 1
+                    node.total_reward += reward
 
-            # also update the root
-            root.visits += 1
-            root.total_reward += reward
+                    for n in available_nodes:
+                        n.availability_count += 1    
+                roots[player].visits += 1
+                roots[player].total_reward += reward    
 
         # Return best move
-        best_child = max(root.children, key=lambda c: c.visits)
+        best_child = max(roots[self.player].children, key=lambda c: c.visits)
         return best_child.move
 
 
@@ -128,5 +147,5 @@ class MOISMCTS():
     def _find_or_create_child(self, d: PhantomTTTState, node: Node):
         for child in node.children:
             if child.move == 'opponent moved':
-                return child
-        return Node(move = 'opponent moved', parent = node)
+                return True, child
+        return False, Node(move = 'opponent moved', parent = node)

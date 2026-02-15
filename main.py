@@ -4,6 +4,7 @@ from agents.human import HumanPlayer
 from agents.random import RandomAgent
 
 from agents.so_ismcts import SOISMCTS
+from agents.mo_ismcts import MOISMCTS
 
 
 # game = PhantomTTTState()
