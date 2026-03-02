@@ -2,6 +2,7 @@ import random
 import math
 
 from phantom_ttt_state import PhantomTTTState
+from agents.heuristics import RandomAgent, CenterAgent, CornerAgent
 
 class Node():   #v
     def __init__(self, move=None, parent=None):
@@ -33,7 +34,14 @@ class OMMOISMCTS():
         self.player = player
         self.iterations = iterations
 
+        # Uniform prior beliefs
+        self.models = [RandomAgent(), CenterAgent(), CornerAgent()]
+        self.beliefs = [1/3, 1/3, 1/3]
+
     def get_move(self, state):
+        if state.current_player != self.player:
+            raise ValueError(f"Agent {self.player} was asked to move, but it is Player {state.current_player}'s turn.")
+
         # Initialize roots for both players
         roots = {1: Node(), 2: Node()}                  # Dictionary of roots
 
@@ -127,6 +135,43 @@ class OMMOISMCTS():
         # Return best move
         best_child = max(roots[self.player].children, key=lambda c: c.visits)
         return best_child.move
+    
+    ########## OPPONENT MODELLING ##########
+    def bayesian_update(self, legal_moves_before_move: list, move: int, success: bool):
+        # This function updates the agent's beliefs about the opponent's type.
+        # The observation is the outcome (success/collision) of the agent's own move.
+        # This reveals information about whether an opponent's piece was on the target tile.
+
+        # Find the index of the move to get its probability from the distributions.
+        try:
+            move_index = legal_moves_before_move.index(move)
+        except ValueError:
+            # This can happen if get_move returned an illegal move.
+            # In this case, we cannot update beliefs, so we just return.
+            return
+
+        # Get the probability of the opponent having a piece on the chosen tile, according to each model.
+        prob_m_1 = self.models[0]._get_probabilities(legal_moves_before_move)[move_index]
+        prob_m_2 = self.models[1]._get_probabilities(legal_moves_before_move)[move_index]
+        prob_m_3 = self.models[2]._get_probabilities(legal_moves_before_move)[move_index]
+
+        # Calculate Likelihoods: P(o|m_i)
+        # If success (empty tile), likelihood is 1 - prob. If collision, likelihood is prob.
+        likelihood_1 = prob_m_1 if not success else 1.0 - prob_m_1
+        likelihood_2 = prob_m_2 if not success else 1.0 - prob_m_2
+        likelihood_3 = prob_m_3 if not success else 1.0 - prob_m_3
+
+        # Calculate Denominator (Sum of Likelihood * Prior)
+        denominator = (likelihood_1 * self.beliefs[0]) + \
+                      (likelihood_2 * self.beliefs[1]) + \
+                      (likelihood_3 * self.beliefs[2])
+
+        # Calculate Posteriors: P(m_i|o) and update beliefs
+        if denominator > 0:
+            self.beliefs[0] = (likelihood_1 * self.beliefs[0]) / denominator
+            self.beliefs[1] = (likelihood_2 * self.beliefs[1]) / denominator
+            self.beliefs[2] = (likelihood_3 * self.beliefs[2]) / denominator
+
 
 
     ########## HELPER FUNCTIONS ##########

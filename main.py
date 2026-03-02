@@ -1,10 +1,12 @@
 from phantom_ttt_state import PhantomTTTState
 
 from agents.human import HumanPlayer
-from agents.random import RandomAgent
+
+from agents.heuristics import RandomAgent, CenterAgent, CornerAgent
 
 from agents.so_ismcts import SOISMCTS
 from agents.mo_ismcts import MOISMCTS
+from agents.om_mo_ismcts import OMMOISMCTS
 
 
 # game = PhantomTTTState()
@@ -40,11 +42,22 @@ def play_game(p1=RandomAgent(1), p2=RandomAgent(2)):
         current_player = game.current_player
 
         if current_player == 1:
+            pre_move_legal_moves = game.get_legal_moves()
             move = p1.get_move(game)
-        else:
-            move = p2.get_move(game)
+            success = game.apply_move(move)
 
-        game.apply_move(move)
+            if hasattr(p1, 'bayesian_update'):
+                p1.bayesian_update(pre_move_legal_moves, move, success)
+                print(f"P1 Beliefs: {p1.beliefs}")
+
+        else:
+            pre_move_legal_moves = game.get_legal_moves()
+            move = p2.get_move(game)
+            success = game.apply_move(move)
+
+            if hasattr(p2, 'bayesian_update'):
+                p2.bayesian_update(pre_move_legal_moves, move, success)
+                print(f"P2 Beliefs: {p2.beliefs}")
 
     return game.winner
 
@@ -61,8 +74,9 @@ def play_n_games(p1, p2, n):
 
 
 if __name__ == '__main__':
-    p1 = SOISMCTS(1, 1000)
-    p2 = RandomAgent(2)
+    p1 = OMMOISMCTS(1, 1000)
+    p2 = CornerAgent(2)
+    # p2 = CenterAgent(2)
 
     print(play_game(p1, p2))
-    play_n_games(p1, p2, 1000)
+    # play_n_games(p1, p2, 1000)
