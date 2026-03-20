@@ -1,6 +1,8 @@
 import random
 import copy
 
+from agents.heuristics import RandomAgent, CenterAgent, CornerAgent
+
 class PhantomTTTState():
     def __init__(self):
         # 0 -> empty 
@@ -13,6 +15,8 @@ class PhantomTTTState():
 
         # Dictionary stores INDICES (0-8) a player knows are blocked by the enemy.
         self.revealed_opponent_positions = {1: set(), 2: set()}
+
+        self.models = [RandomAgent(), CenterAgent(), CornerAgent()]
         
     ########## GAME LOGIC FUNCTIONS ##########
     def apply_move(self, move):
@@ -89,7 +93,7 @@ class PhantomTTTState():
         return self.winner is not None
     
     ########## ISMCTS DEPENDENT FUNCTIONS ##########
-    def determinize(self):
+    def determinize(self, beliefs=None):
         # ---COPY---
         new_state = copy.deepcopy(self)
 
@@ -111,9 +115,16 @@ class PhantomTTTState():
         player_observation = self.get_player_observation(self.current_player)
         candidates = [tile for tile, piece in enumerate(player_observation) if piece == 0]
 
+        if beliefs is not None:
+            mixed_strategy = []
+            for belief, model in beliefs, self.models:
+
+            pass
+        
+        else:
         # Random sampling without replacement
-        random.shuffle(candidates)
-        selected_indices = candidates[:opponent_hidden_count]
+            random.shuffle(candidates)
+            selected_indices = candidates[:opponent_hidden_count]
 
         for tile in selected_indices:
             new_board[tile] = opponent

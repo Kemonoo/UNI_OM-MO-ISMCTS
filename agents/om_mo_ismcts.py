@@ -51,7 +51,7 @@ class OMMOISMCTS():
             visited_nodes = {1: [], 2: []}  # Visited nodes with available compatible children
 
             # A: Determinization
-            d = state.determinize()
+            d = state.determinize(self.beliefs)
 
             # B: Selection
             while not d.is_terminal() and len(self._get_untried_moves(d, current_nodes[d.current_player])) == 0:
