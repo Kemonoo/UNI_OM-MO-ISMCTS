@@ -1,7 +1,5 @@
 import random
 
-from phantom_ttt_state import PhantomTTTState
-
 class HeuristicAgent:
     """
     Base class for heuristic agents.
@@ -10,7 +8,7 @@ class HeuristicAgent:
         self.player_id = player_id
         self.weights = None
     
-    def get_move(self, state: PhantomTTTState):
+    def get_move(self, state):
         valid_moves = state.get_legal_moves()
 
         if not valid_moves:

@@ -30,13 +30,14 @@ class Node():   #v
         return exploitation + exploration
 
 class OMMOISMCTS():
-    def __init__(self, player, iterations):
+    def __init__(self, player, iterations, mode='full'):
         self.player = player
         self.iterations = iterations
+        self.mode = mode
 
         # Uniform prior beliefs
         self.models = [RandomAgent(), CenterAgent(), CornerAgent()]
-        self.beliefs = [1/3, 1/3, 1/3]
+        self.belief_distribution = [1/3, 1/3, 1/3]
 
     def get_move(self, state):
         if state.current_player != self.player:
@@ -51,14 +52,28 @@ class OMMOISMCTS():
             visited_nodes = {1: [], 2: []}  # Visited nodes with available compatible children
 
             # A: Determinization
-            d = state.determinize(self.beliefs)
+            if self.mode in ['full', 'determinization_only']:
+                d = state.determinize(self._get_biased_heatmap(state))
+            else:
+                d = state.determinize()
 
-            # B: Selection
+            # B: SELECTION
             while not d.is_terminal() and len(self._get_untried_moves(d, current_nodes[d.current_player])) == 0:
                 compatible_children = self._get_compatible_children(d, current_nodes[d.current_player])
 
-                # Select child with highest UCB
-                best_child = max(compatible_children, key=lambda c: c._ucb())
+                if d.current_player == self.player:
+                    # always choose best UCB on our turn
+                    best_child = max(compatible_children, key=lambda c: c._ucb())
+                else:
+                    if self.mode in ['full', 'selection_only']:
+                        # Biased selection on opponent turn
+                        heatmap_dict = self._get_biased_heatmap(d)
+                        weights = [heatmap_dict[c.move] for c in compatible_children]
+                        best_child = random.choices(compatible_children, weights=weights, k=1)[0]
+                    else:
+                        # Determinization-only mode: opponent selection is neutral MCTS UCB
+                        best_child = max(compatible_children, key=lambda c: c._ucb())
+
 
                 # Update current player
                 visited_nodes[d.current_player].append((best_child, compatible_children))
@@ -86,7 +101,6 @@ class OMMOISMCTS():
                 move = random.choice(self._get_untried_moves(d, current_nodes[d.current_player]))
                 new_child = Node(move=move, parent=current_nodes[d.current_player])
                 current_nodes[d.current_player].children.append(new_child)
-
 
                 # Update current player
                 compatible_children = self._get_compatible_children(d, current_nodes[d.current_player])
@@ -136,6 +150,7 @@ class OMMOISMCTS():
         best_child = max(roots[self.player].children, key=lambda c: c.visits)
         return best_child.move
     
+
     ########## OPPONENT MODELLING ##########
     def bayesian_update(self, legal_moves_before_move: list, move: int, success: bool):
         # This function updates the agent's beliefs about the opponent's type.
@@ -162,20 +177,38 @@ class OMMOISMCTS():
         likelihood_3 = prob_m_3 if not success else 1.0 - prob_m_3
 
         # Calculate Denominator (Sum of Likelihood * Prior)
-        denominator = (likelihood_1 * self.beliefs[0]) + \
-                      (likelihood_2 * self.beliefs[1]) + \
-                      (likelihood_3 * self.beliefs[2])
+        denominator = (likelihood_1 * self.belief_distribution[0]) + \
+                      (likelihood_2 * self.belief_distribution[1]) + \
+                      (likelihood_3 * self.belief_distribution[2])
 
         # Calculate Posteriors: P(m_i|o) and update beliefs
         if denominator > 0:
-            self.beliefs[0] = (likelihood_1 * self.beliefs[0]) / denominator
-            self.beliefs[1] = (likelihood_2 * self.beliefs[1]) / denominator
-            self.beliefs[2] = (likelihood_3 * self.beliefs[2]) / denominator
+            self.belief_distribution[0] = (likelihood_1 * self.belief_distribution[0]) / denominator
+            self.belief_distribution[1] = (likelihood_2 * self.belief_distribution[1]) / denominator
+            self.belief_distribution[2] = (likelihood_3 * self.belief_distribution[2]) / denominator
+
+    
+    def _get_biased_heatmap(self, state):
+        # This function returns biased heatmap of mixed strategies of possible opponents
+        # weighted by their respective probabilities of being our current opponent
+        legal_moves = state.get_legal_moves()
+        heatmap = [0.0] * len(legal_moves)
+
+        for i, model in enumerate(self.models):
+            probabilities = model._get_probabilities(legal_moves)
+            belief = self.belief_distribution[i]
+
+            # Add the weighted probability to each move individually
+            for j in range(len(legal_moves)):
+                heatmap[j] += probabilities[j] * belief
+
+        return dict(zip(legal_moves, heatmap))
 
 
 
     ########## HELPER FUNCTIONS ##########
     def _get_compatible_children(self, d: PhantomTTTState, node: Node):
+        # Returns exisitng child nodes that are compatible with the current determinization
         legal_moves_set = set(d.get_legal_moves())
         compatible_children = [
             c for c in node.children

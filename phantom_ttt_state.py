@@ -1,5 +1,6 @@
 import random
 import copy
+import numpy as np
 
 from agents.heuristics import RandomAgent, CenterAgent, CornerAgent
 
@@ -93,7 +94,7 @@ class PhantomTTTState():
         return self.winner is not None
     
     ########## ISMCTS DEPENDENT FUNCTIONS ##########
-    def determinize(self, beliefs=None):
+    def determinize(self, heatmap=None):
         # ---COPY---
         new_state = copy.deepcopy(self)
 
@@ -111,15 +112,26 @@ class PhantomTTTState():
         total_opponent_pieces = self.board.count(opponent)
         opponent_hidden_count = total_opponent_pieces - len(self.revealed_opponent_positions[self.current_player])
 
+        # If there are no hidden pieces the same board is returned
+        if opponent_hidden_count <= 0:
+            new_state.board = new_board
+            new_state.revealed_opponent_positions[opponent] = set() 
+            return new_state
+
         # Identify candidate tiles
         player_observation = self.get_player_observation(self.current_player)
         candidates = [tile for tile, piece in enumerate(player_observation) if piece == 0]
 
-        if beliefs is not None:
-            mixed_strategy = []
-            for belief, model in beliefs, self.models:
+        if heatmap is not None:
+            candidate_tiles = list(heatmap.keys())
+            candidate_probs = list(heatmap.values())
 
-            pass
+            selected_indices = np.random.choice(
+                candidate_tiles, 
+                size=opponent_hidden_count, 
+                replace=False, 
+                p=candidate_probs
+            )
         
         else:
         # Random sampling without replacement
