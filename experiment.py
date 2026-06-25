@@ -25,7 +25,7 @@ AGENTS = {
     "Baseline": lambda pid, iters: MOISMCTS(pid, iters),
     "Det-Only": lambda pid, iters: OMMOISMCTS(pid, iters, mode='determinization_only'),
     "Sel-Only": lambda pid, iters: OMMOISMCTS(pid, iters, mode='selection_only'),
-    "Full OM": lambda pid, iters: OMMOISMCTS(pid, iters, mode='full')
+    "Full-OM": lambda pid, iters: OMMOISMCTS(pid, iters, mode='full'),
 }
 
 def play_game(agent_p1, agent_p2, opponent_type, track_beliefs=False):
@@ -79,7 +79,7 @@ def _worker_play_single_game(agent_name, opponent_name, iterations, agent_first,
         if agent_name == "Baseline": return MOISMCTS(pid, iterations)
         elif agent_name == "Det-Only": return OMMOISMCTS(pid, iterations, mode='determinization_only')
         elif agent_name == "Sel-Only": return OMMOISMCTS(pid, iterations, mode='selection_only')
-        elif agent_name == "Full OM": return OMMOISMCTS(pid, iterations, mode='full')
+        elif agent_name == "Full-OM": return OMMOISMCTS(pid, iterations, mode='full')
 
     if agent_first:
         p1, p2 = create_om_agent(1), opp_class(2)
@@ -231,9 +231,10 @@ def run_experiment(games_per_matchup, iteration_budgets, seed=None):
 
     filename = save_results(results, belief_analyses, games_per_matchup, iteration_budgets, seed=seed)
     print(f"\nExperiment completed! Data strictly saved to {filename}")
+    return filename
 
 if __name__ == '__main__':
-    games_per_matchup = 10000 
+    games_per_matchup = 10000
     iteration_budgets = [500, 2000]
     seed = 42
 

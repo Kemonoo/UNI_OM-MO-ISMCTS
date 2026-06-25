@@ -2,8 +2,6 @@ import random
 import copy
 import numpy as np
 
-from agents.heuristics import RandomAgent, CenterAgent, CornerAgent
-
 class PhantomTTTState():
     def __init__(self):
         # 0 -> empty 
@@ -17,8 +15,6 @@ class PhantomTTTState():
         # Dictionary stores INDICES (0-8) a player knows are blocked by the enemy.
         self.revealed_opponent_positions = {1: set(), 2: set()}
 
-        self.models = [RandomAgent(), CenterAgent(), CornerAgent()]
-        
     ########## GAME LOGIC FUNCTIONS ##########
     def apply_move(self, move):
         """

@@ -39,6 +39,11 @@ class OMMOISMCTS():
         self.models = [RandomAgent(), CenterAgent(), CornerAgent()]
         self.belief_distribution = [1/3, 1/3, 1/3]
 
+        # Counters used to recover h, the number of opponent pieces that are
+        # still HIDDEN from us at the moment of a probe (see bayesian_update).
+        self.placed_pieces = 0   # our own successful placements so far
+        self.collisions = 0      # opponent pieces we have already revealed
+
     def get_move(self, state):
         if state.current_player != self.player:
             raise ValueError(f"Agent {self.player} was asked to move, but it is Player {state.current_player}'s turn.")
@@ -161,20 +166,27 @@ class OMMOISMCTS():
         try:
             move_index = legal_moves_before_move.index(move)
         except ValueError:
-            # This can happen if get_move returned an illegal move.
-            # In this case, we cannot update beliefs, so we just return.
             return
 
-        # Get the probability of the opponent having a piece on the chosen tile, according to each model.
+        # h = number of opponent pieces still HIDDEN from us at this probe.
+        h = self.placed_pieces + (1 if self.player == 2 else 0) - self.collisions
+
+        # Per-model single-placement probability p for the chosen tile,
+        # normalized over the available (legal) tiles.
         prob_m_1 = self.models[0]._get_probabilities(legal_moves_before_move)[move_index]
         prob_m_2 = self.models[1]._get_probabilities(legal_moves_before_move)[move_index]
         prob_m_3 = self.models[2]._get_probabilities(legal_moves_before_move)[move_index]
 
-        # Calculate Likelihoods: P(o|m_i)
-        # If success (empty tile), likelihood is 1 - prob. If collision, likelihood is prob.
-        likelihood_1 = prob_m_1 if not success else 1.0 - prob_m_1
-        likelihood_2 = prob_m_2 if not success else 1.0 - prob_m_2
-        likelihood_3 = prob_m_3 if not success else 1.0 - prob_m_3
+        # miss = (1 - p)^h : probability that the model placed NONE of its h hidden
+        # pieces on this tile. A success means all h missed the tile, so the
+        # likelihood is miss; a collision is the complementary event, 1 - miss.
+        miss_1 = (1.0 - prob_m_1) ** h
+        miss_2 = (1.0 - prob_m_2) ** h
+        miss_3 = (1.0 - prob_m_3) ** h
+
+        likelihood_1 = miss_1 if success else 1.0 - miss_1
+        likelihood_2 = miss_2 if success else 1.0 - miss_2
+        likelihood_3 = miss_3 if success else 1.0 - miss_3
 
         # Calculate Denominator (Sum of Likelihood * Prior)
         denominator = (likelihood_1 * self.belief_distribution[0]) + \
@@ -186,6 +198,12 @@ class OMMOISMCTS():
             self.belief_distribution[0] = (likelihood_1 * self.belief_distribution[0]) / denominator
             self.belief_distribution[1] = (likelihood_2 * self.belief_distribution[1]) / denominator
             self.belief_distribution[2] = (likelihood_3 * self.belief_distribution[2]) / denominator
+
+        # Update the counters AFTER using them, so the next probe sees the right h.
+        if success:
+            self.placed_pieces += 1   # we placed a piece; turn will pass to the opponent
+        else:
+            self.collisions += 1      # we revealed one of the opponent's hidden pieces
 
     
     def _get_biased_heatmap(self, state):

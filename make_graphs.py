@@ -1,139 +1,180 @@
 import json
+import glob
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 from collections import defaultdict
 
-# Experiment configurations and standardized visualization palette
-OPPONENTS = ["Random", "Center-Heavy", "Corner-Heavy"]
-AGENTS = ["Baseline", "Det-Only", "Sel-Only", "Full OM"]
+import naming
 
-AGENT_COLORS = {
-    "Baseline": "C0",
-    "Det-Only": "C1",
-    "Sel-Only": "C2",
-    "Full OM":  "C3"
-}
+# Experiment configuration and the visualization palette. Agent naming
+# (stored key <-> OM-X display label, colors) lives in naming.py.
+OPPONENTS = ["Random", "Center-Heavy", "Corner-Heavy"]
+AGENTS = naming.DISPLAY_AGENTS          # display order: Baseline, OM-Det, OM-Sel, OM-Full
+AGENT_STORED = naming.STORED            # display name -> stored name (for reading the JSON)
+AGENT_COLORS = naming.COLORS
 
 def load_data(filepath):
-    """Loads the JSON data file."""
+    """Loads the results JSON."""
     with open(filepath, 'r') as f:
         return json.load(f)
 
-def plot_win_rates(data):
-    """Plots the overall win rates vertically for all iteration budgets."""
+def plot_win_rates(data, xmin=75, xmax=93):
+    """Plots overall win rates as horizontal grouped bars, one panel per budget.
+
+    Horizontal bars keep the value labels at the bar tips (instead of colliding
+    above vertical bars), and the win-rate axis is truncated to [xmin, xmax] so
+    the differences between agents (all clustered in ~80-91%) are visible. Sized
+    for a full-width figure --- include it in the thesis with `figure*` /
+    \\textwidth, since 24 labelled bars do not fit a single column.
+    """
     results = data['results']
     iteration_budgets = data['config']['iteration_budgets']
-    
-    fig, axes = plt.subplots(len(iteration_budgets), 1, figsize=(10, 5 * len(iteration_budgets)))
-    if len(iteration_budgets) == 1: axes = [axes]
-    
-    fig.suptitle('Overall Win Rates by Iteration Budget', fontsize=16, fontweight='bold', y=0.95)
 
-    x = np.arange(len(OPPONENTS))
-    width = 0.2 
+    fig, axes = plt.subplots(len(iteration_budgets), 1, figsize=(7.0, 4.0 * len(iteration_budgets)),
+                             sharex=True)
+    if len(iteration_budgets) == 1: axes = [axes]
+
+    fig.suptitle('Overall Win Rates by Iteration Budget', fontsize=15, fontweight='bold')
+
+    y = np.arange(len(OPPONENTS))
+    bar_h = 0.92 / len(AGENTS)
 
     for i, iters in enumerate(iteration_budgets):
         ax = axes[i]
-        ax.set_title(f'{iters} Iterations', fontsize=14, pad=10)
+        ax.set_title(f'{iters} Iterations', fontsize=13, pad=6)
 
-        # Aggregate win rates
+        # Aggregate win rates (keyed by the stored agent name in the JSON)
         agent_data = defaultdict(lambda: defaultdict(list))
         for r in results:
             if r['iterations'] == iters:
-                agent = r['agent']
-                opponent = r['opponent']
                 winrate = r['p1_winrate'] if r['agent_first'] else r['p2_winrate']
-                agent_data[agent][opponent].append(winrate)
+                agent_data[r['agent']][r['opponent']].append(winrate)
 
-        # Plot bars per agent
+        # One horizontal bar per agent, grouped by opponent (top agent first)
         for j, agent in enumerate(AGENTS):
-            winrates = [np.mean(agent_data[agent][opp]) if agent_data[agent][opp] else 0 for opp in OPPONENTS]
-            offset = (j - 1.5) * width 
-            
-            bars = ax.bar(x + offset, winrates, width, label=agent, color=AGENT_COLORS[agent], alpha=0.9, zorder=3)
-            
-            # Add value labels above bars
+            stored = AGENT_STORED[agent]
+            winrates = [np.mean(agent_data[stored][opp]) if agent_data[stored][opp] else 0 for opp in OPPONENTS]
+            offset = (j - (len(AGENTS) - 1) / 2) * bar_h
+
+            bars = ax.barh(y + offset, winrates, bar_h, label=agent,
+                           color=AGENT_COLORS[agent], alpha=0.9, zorder=3)
+
             for bar in bars:
-                height = bar.get_height()
-                if height > 0: 
-                    ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
-                            f'{height:.2f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+                w = bar.get_width()
+                if w > 0:
+                    ax.text(w + 0.2, bar.get_y() + bar.get_height() / 2.,
+                            f'{w:.2f}%', va='center', ha='left', fontsize=8.5)
 
-        # Subplot formatting
-        ax.set_ylabel('Win Rate (%)', fontsize=12, labelpad=10)
-        ax.set_xticks(x)
-        ax.set_xticklabels(OPPONENTS, fontsize=11)
-        ax.set_ylim(50, 100)
-        ax.set_yticks(np.arange(50, 101, 10))
-        ax.grid(axis='y', linestyle='--', alpha=0.6, zorder=0)
-        
-        # Apply bottom-level formatting
+        ax.set_yticks(y)
+        ax.set_yticklabels(OPPONENTS, fontsize=11)
+        ax.invert_yaxis()                     # first opponent at the top
+        ax.set_xlim(xmin, xmax)
+        ax.grid(axis='x', linestyle='--', alpha=0.6, zorder=0)
         if i == len(iteration_budgets) - 1:
-            ax.set_xlabel('Opponent', fontsize=12, labelpad=10)
-            ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4, frameon=False, fontsize=11)
+            ax.set_xlabel('Win Rate (%)', fontsize=12, labelpad=8)
 
-    plt.tight_layout()
-    fig.subplots_adjust(top=0.90, hspace=0.25)
-    
+    # Shared legend across the top of the figure
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.965),
+               ncol=len(AGENTS), frameon=False, fontsize=10)
+
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
+
     os.makedirs('data', exist_ok=True)
     save_path = 'data/win_rates.png'
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     print(f"Saved: {save_path}")
     plt.show()
 
-def plot_timing(data):
-    """Plots the average execution times vertically for all iteration budgets."""
-    results = data['results']
-    iteration_budgets = data['config']['iteration_budgets']
-    
-    fig, axes = plt.subplots(len(iteration_budgets), 1, figsize=(8, 5 * len(iteration_budgets)))
-    if len(iteration_budgets) == 1: axes = [axes]
-    
-    fig.suptitle('Average Move Time by Iteration Budget', fontsize=16, fontweight='bold', y=0.95)
+def plot_timing(data, timing_data=None):
+    """Plots the average move time per agent per budget.
+
+    Preferred source is `timing_data`, the single-threaded benchmark produced by
+    benchmark_timing.py (means with std error bars). Those numbers are
+    representative of single-agent latency. If no benchmark is provided, it falls
+    back to the main run's avg_time_p1/p2 (measured under CPU contention),
+    selecting only the evaluated agent's seat (the previous version averaged in
+    the heuristic opponent's ~0 s seat, halving every value).
+    """
+    use_bench = timing_data is not None
+    if use_bench:
+        budgets = timing_data['config']['budgets']
+        bench = timing_data['timing']
+    else:
+        budgets = data['config']['iteration_budgets']
+        results = data['results']
+
+    fig, axes = plt.subplots(len(budgets), 1, figsize=(8, 5 * len(budgets)))
+    if len(budgets) == 1: axes = [axes]
+
+    fig.suptitle('Average Move Time by Iteration Budget',
+                 fontsize=16, fontweight='bold', y=0.97)
 
     x = np.arange(len(AGENTS))
-    width = 0.5 
+    width = 0.5
 
-    for i, iters in enumerate(iteration_budgets):
+    for i, iters in enumerate(budgets):
         ax = axes[i]
         ax.set_title(f'{iters} Iterations', fontsize=14, pad=10)
 
-        # Aggregate move times
-        agent_times = defaultdict(list)
-        for r in results:
-            if r['iterations'] == iters:
-                agent = r['agent']
-                agent_times[agent].append(r['avg_time_p1'])
-                agent_times[agent].append(r['avg_time_p2'])
+        means, errs = [], []
+        if use_bench:
+            cell = bench.get(str(iters), {})
+            for agent in AGENTS:
+                s = cell.get(AGENT_STORED[agent])
+                means.append(s['mean'] if s else 0.0)
+                errs.append(s['std'] if s else 0.0)
+        else:
+            # One seat per matchup is the evaluated agent; take only that seat.
+            agent_times = defaultdict(list)
+            for r in results:
+                if r['iterations'] == iters:
+                    agent_time = r['avg_time_p1'] if r['agent_first'] else r['avg_time_p2']
+                    agent_times[r['agent']].append(agent_time)
+            for agent in AGENTS:
+                vals = agent_times[AGENT_STORED[agent]]
+                means.append(np.mean(vals) if vals else 0.0)
+                errs.append(np.std(vals) if vals else 0.0)
 
-        times = [np.mean(agent_times[agent]) if agent_times[agent] else 0 for agent in AGENTS]
         bar_colors = [AGENT_COLORS[agent] for agent in AGENTS]
+        bars = ax.bar(x, means, width, color=bar_colors, alpha=0.9, zorder=3,
+                      yerr=(errs if use_bench else None), capsize=4,
+                      error_kw={'ecolor': '0.3', 'lw': 1, 'zorder': 4})
 
-        bars = ax.bar(x, times, width, color=bar_colors, alpha=0.9, zorder=3)
-        
+        top = max([m + e for m, e in zip(means, errs)] + [1e-9])
+
         # Add value labels above bars
-        for bar in bars:
+        for bar, e in zip(bars, errs):
             height = bar.get_height()
-            if height > 0: 
-                ax.text(bar.get_x() + bar.get_width()/2., height + (max(times) * 0.05),
+            if height > 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height + e + top * 0.03,
                         f'{height:.3f} s', ha='center', va='bottom', fontsize=11, fontweight='bold')
 
         # Subplot formatting
         ax.set_ylabel('Average Time (s)', fontsize=12, labelpad=10)
         ax.set_xticks(x)
         ax.set_xticklabels(AGENTS, fontsize=12)
-        ax.set_ylim(0, max(times) * 1.2)
+        ax.set_ylim(0, top * 1.25)
         ax.grid(axis='y', linestyle='--', alpha=0.6, zorder=0)
 
     plt.tight_layout()
     fig.subplots_adjust(top=0.90, hspace=0.3)
-    
+
     os.makedirs('data', exist_ok=True)
     save_path = 'data/move_times.png'
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     print(f"Saved: {save_path}")
     plt.show()
+
+
+def load_latest_timing_benchmark(directory='data'):
+    """Return the parsed newest data/timing_benchmark_*.json, or None if absent."""
+    matches = sorted(glob.glob(os.path.join(directory, 'timing_benchmark_*.json')))
+    if not matches:
+        return None
+    print(f"Using timing benchmark: {matches[-1]}")
+    return load_data(matches[-1])
 
 def pool_belief_data(belief_analyses):
     """Calculates the weighted pooled mean and pooled standard deviation across all iteration budgets."""
@@ -174,33 +215,33 @@ def pool_belief_data(belief_analyses):
     return pooled
 
 def plot_belief_convergence(data):
-    """Plots belief convergence for the Full OM agent: P1 vs P2."""
+    """Plots belief convergence for the OM-Full agent: P1 vs P2."""
     belief_analyses = data.get('belief_analyses', {})
     if not belief_analyses:
         print("Warning: No belief data found in JSON.")
         return
-        
+
     data_to_plot = pool_belief_data(belief_analyses)
     iters_used = " & ".join([str(i) for i in data['config']['iteration_budgets']])
-    
+
     # 3x1 Vertical Grid
     fig, axes = plt.subplots(3, 1, figsize=(8, 12), sharex=True, sharey=True)
-    fig.suptitle(f'Full OM Belief Convergence: Player 1 vs Player 2', fontsize=16, fontweight='bold', y=0.99)
+    fig.suptitle(f'OM-Full Belief Convergence: Player 1 and Player 2', fontsize=16, fontweight='bold', y=0.99)
 
     for i, opp in enumerate(OPPONENTS):
         ax = axes[i]
         ax.set_title(f'vs {opp}', fontsize=14, pad=10)
 
-        # Only look at the Full OM agent
-        if 'Full OM' in data_to_plot and opp in data_to_plot['Full OM']:
-            opp_data = data_to_plot['Full OM'][opp]
-            
+        # Only look at the OM-Full agent (stored key "Full-OM")
+        if 'Full-OM' in data_to_plot and opp in data_to_plot['Full-OM']:
+            opp_data = data_to_plot['Full-OM'][opp]
+
             # Plot Player 1 (Solid Line)
             if 'p1' in opp_data:
                 moves_p1 = sorted([int(m) for m in opp_data['p1'].keys()])[:10]
                 avg_p1 = np.array([opp_data['p1'][str(m)]['avg_belief_correct'] for m in moves_p1])
                 std_p1 = np.array([opp_data['p1'][str(m)]['std_belief_correct'] for m in moves_p1])
-                
+
                 ax.plot(moves_p1, avg_p1, label='As Player 1', linestyle='-', marker='o', color='C0', linewidth=2)
                 ax.fill_between(moves_p1, np.clip(avg_p1 - std_p1, 0, 1), np.clip(avg_p1 + std_p1, 0, 1), color='C0', alpha=0.15)
 
@@ -209,13 +250,13 @@ def plot_belief_convergence(data):
                 moves_p2 = sorted([int(m) for m in opp_data['p2'].keys()])[:10]
                 avg_p2 = np.array([opp_data['p2'][str(m)]['avg_belief_correct'] for m in moves_p2])
                 std_p2 = np.array([opp_data['p2'][str(m)]['std_belief_correct'] for m in moves_p2])
-                
+
                 ax.plot(moves_p2, avg_p2, label='As Player 2', linestyle='--', marker='s', color='C3', linewidth=2)
                 ax.fill_between(moves_p2, np.clip(avg_p2 - std_p2, 0, 1), np.clip(avg_p2 + std_p2, 0, 1), color='C3', alpha=0.15)
 
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.set_ylim(0, 1.05)
-        
+
         # Draw a subtle line at 0.33 to show the baseline prior
         ax.axhline(y=0.333, color='gray', linestyle=':', alpha=0.8)
         ax.xaxis.get_major_locator().set_params(integer=True)
@@ -225,23 +266,43 @@ def plot_belief_convergence(data):
 
     axes[2].legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False, fontsize=12)
     plt.tight_layout()
-    
+
     os.makedirs('data', exist_ok=True)
     save_path = 'data/belief_convergence_clean.png'
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     print(f"Saved clean convergence graph to: {save_path}")
     plt.show()
 
+def _resolve_results(argv):
+    """Results JSON from argv[1], else the newest sizeable data/ run (prelim
+    files are tiny, so the size filter keeps only main-ablation outputs)."""
+    if len(argv) > 1:
+        return argv[1]
+    cands = [p for p in glob.glob('data/experiment_results_*.json') if os.path.getsize(p) > 100_000]
+    if cands:
+        return max(cands, key=os.path.getmtime)
+    return None
+
+
 if __name__ == '__main__':
-    # Define the target dataset generated by experiment.py
-    filepath = 'data/experiment_results_20260331_163428.json'
-    
+    import sys
+
+    # Pass the results JSON as argv[1]; otherwise the newest main run in data/ is used.
+    filepath = _resolve_results(sys.argv)
+    if not filepath:
+        print("usage: python make_graphs.py <results.json>")
+        raise SystemExit(1)
+
     if os.path.exists(filepath):
         print(f"Loading data from {filepath}...")
         data = load_data(filepath)
-        
+
+        # Prefer the single-threaded timing benchmark (benchmark_timing.py) if one
+        # exists; otherwise plot_timing falls back to the contended main-run times.
+        timing_data = load_latest_timing_benchmark()
+
         plot_win_rates(data)
-        plot_timing(data)
+        plot_timing(data, timing_data)
         plot_belief_convergence(data)
     else:
         print(f"File {filepath} not found. Please run the experiment first.")

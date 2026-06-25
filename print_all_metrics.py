@@ -1,6 +1,8 @@
 import json
 from collections import defaultdict
 
+import naming
+
 def pool_belief_data(belief_analyses):
     """Mathematically pools the means across all iteration budgets."""
     pooled = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
@@ -76,12 +78,12 @@ def print_all_metrics(filepath):
         print(f"==================== ITERATION BUDGET: {it} ====================")
         print(f"{'='*80}")
         
-        agents = ['Baseline', 'Det-Only', 'Sel-Only', 'Full OM']
+        agents = naming.STORED_AGENTS
         for agent in agents:
             if agent not in agg[it]: continue
-            
+
             print(f"\n\n{'*'*60}")
-            print(f"AGENT: {agent} ({it} Iterations)")
+            print(f"AGENT: {naming.disp(agent)} ({it} Iterations)")
             
             avg_overall_time = sum(overall_agent_times[it][agent]) / len(overall_agent_times[it][agent])
             print(f"OVERALL MASTER MOVE TIME: {avg_overall_time:.5f} sec/move")
@@ -96,7 +98,7 @@ def print_all_metrics(filepath):
                 p2_wr = (stats['p2_wins'] / games_per_side) * 100
                 overall_wr = ((stats['p1_wins'] + stats['p2_wins']) / (games_per_side * 2)) * 100
                 
-                print(f"\n>>> MATCHUP: {agent} vs {opp} <<<")
+                print(f"\n>>> MATCHUP: {naming.disp(agent)} vs {opp} <<<")
                 print(f"  [WIN RATES]")
                 print(f"    - As Player 1 : {p1_wr:5.2f}%")
                 print(f"    - As Player 2 : {p2_wr:5.2f}%")
@@ -108,19 +110,19 @@ def print_all_metrics(filepath):
 
     # 3. Print Pooled Belief Convergence at the End
     print(f"\n\n{'='*80}")
-    print(f"====== POOLED BELIEF CONVERGENCE: FULL OM (500 & 2000 Iterations) ======")
+    print(f"====== POOLED BELIEF CONVERGENCE: OM-Full (500 & 2000 Iterations) ======")
     print(f"{'='*80}")
-    
+
     belief_analyses = data.get('belief_analyses', {})
     if not belief_analyses:
         print("No belief data found in JSON.")
     else:
         pooled_beliefs = pool_belief_data(belief_analyses)
-        agent = 'Full OM'
-        
+        agent = 'Full-OM'
+
         if agent in pooled_beliefs:
             for opp in ['Random', 'Center-Heavy', 'Corner-Heavy']:
-                print(f"\n>>> Full OM Confidence predicting '{opp}' <<<")
+                print(f"\n>>> OM-Full Confidence predicting '{opp}' <<<")
                 if opp in pooled_beliefs[agent]:
                     for role in ['p1', 'p2']:
                         role_str = "Player 1" if role == 'p1' else "Player 2"
@@ -137,5 +139,18 @@ def print_all_metrics(filepath):
                             print(f"    - {' | '.join(b_str_parts)}")
 
 if __name__ == '__main__':
-    filepath = 'data/experiment_results_20260331_163428.json'
+    import sys
+    import glob
+    import os
+
+    # Pass the results JSON as argv[1]; otherwise use the newest sizeable main run
+    # in data/ (prelim files are tiny, so the size filter excludes them).
+    if len(sys.argv) > 1:
+        filepath = sys.argv[1]
+    else:
+        cands = [p for p in glob.glob('data/experiment_results_*.json') if os.path.getsize(p) > 100_000]
+        filepath = max(cands, key=os.path.getmtime) if cands else None
+        if not filepath:
+            print("usage: python print_all_metrics.py <results.json>")
+            raise SystemExit(1)
     print_all_metrics(filepath)

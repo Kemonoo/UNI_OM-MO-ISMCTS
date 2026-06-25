@@ -1,0 +1,6 @@
+# Runtime dependencies for the OM-MO-ISMCTS experiments.
+# Tested with Python 3.12. numpy is used in the agents/experiments; matplotlib
+# only for the figure scripts. Pinned to the versions this project was run with;
+# loosen if you need to.
+numpy==2.4.4
+matplotlib==3.10.3

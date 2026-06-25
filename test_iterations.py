@@ -19,8 +19,11 @@ def play_game(p1, p2, verbose=False):
     while not game.is_terminal():
         current_player = game.current_player
         agent = p1 if current_player == 1 else p2
+        legal_before = game.get_legal_moves()
         move = agent.get_move(game)
-        game.apply_move(move)
+        success = game.apply_move(move)
+        if hasattr(agent, 'bayesian_update'):
+            agent.bayesian_update(legal_before, move, success)
 
     return game.winner
 
@@ -145,14 +148,16 @@ def plot_results(results, output_file='data/iterations_win_rates.png'):
     mo_rates = [x[1]['agent_win_rate'] for x in results['MOISMCTS']]
     om_rates = [x[1]['agent_win_rate'] for x in results['OMMOISMCTS_full']]
 
+    x = np.arange(len(iteration_steps))
+
     plt.figure(figsize=(10, 6))
-    plt.plot(iteration_steps, mo_rates, marker='o', label='MO-ISMCTS')
-    plt.plot(iteration_steps, om_rates, marker='o', label='OM-MO-ISMCTS (full)')
-    plt.xscale('log')
+    plt.plot(x, mo_rates, marker='o', label='MO-ISMCTS')
+    plt.plot(x, om_rates, marker='o', label='OM-MO-ISMCTS (full)')
+    plt.xticks(x, [str(s) for s in iteration_steps])
     plt.xlabel('Iterations')
     plt.ylabel('Win rate vs CenterAgent')
     plt.title('Iteration count vs win rate (half as P1, half as P2)')
-    plt.grid(True, which='both', linestyle='--', alpha=0.4)
+    plt.grid(True, linestyle='--', alpha=0.4)
     plt.legend()
     plt.tight_layout()
     plt.savefig(output_file)
@@ -161,7 +166,7 @@ def plot_results(results, output_file='data/iterations_win_rates.png'):
 
 if __name__ == '__main__':
     iteration_steps = [100, 200, 500, 1000, 2000, 5000, 10000]
-    n_games = 1000
+    n_games = 3000
     seed = 42
 
     start = time.time()
